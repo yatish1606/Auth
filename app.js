@@ -4,7 +4,8 @@ const express = require('express')
 const ejs = require('ejs')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
-const encrypt = require('mongoose-encryption')
+const brcypt = require('bcrypt')
+const saltRounds = 10;
 
 const app = express()
 
@@ -22,8 +23,6 @@ const UserSchema = new mongoose.Schema ({
     password:String
 })
 
-// this will encrypt password field
-UserSchema.plugin(encrypt, {secret:process.env.SECRET, encryptedFields:['password']});
 
 const User = new mongoose.model('User', UserSchema)
 
@@ -41,16 +40,22 @@ app.get('/register', function(req,res){
     res.render('register')
 })
 
-app.post('/register', function(req,res){
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
-    })
 
-    newUser.save(function(err){
-        if(err) console.log(err)
-        else res.render('secrets')
+
+app.post('/register', function(req,res){
+
+    brcypt.hash(req.body.password, saltRounds, function(err,generatedHash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: generatedHash
+        })
+    
+        newUser.save(function(err){
+            if(err) console.log(err)
+            else res.render('secrets')
+        })
     })
+    
 })
 
 app.post('/login', function(req,res){
@@ -64,10 +69,12 @@ app.post('/login', function(req,res){
         function(err, foundUser){
             if(err) console.log(err)
             else {
-                if(foundUser.password === password){
-                    res.render('secrets')
-                }
-                else res.send("No user found")
+                brcypt.compare(password,foundUser.password, function(err, result){
+                    if(result){
+                        res.render('secrets')
+                    }
+                    else console.log(err)
+                })
             }
         }
     )
